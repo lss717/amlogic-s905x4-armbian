@@ -1,0 +1,55 @@
+#!/bin/sh
+# SC2 (S905X4) gigabit network tuning.
+# Ported from the OpenWrt board script etc/init.d/s905x4-net-tune.
+#
+# 1) TX completion coalescing. The mainline stmmac (dwmac1000/gmac) uses the
+#    global defaults STMMAC_COAL_TX_TIMER=5000us / STMMAC_TX_FRAMES=25, backed
+#    by a software hrtimer. This MAC has a single queue and no HW TSO, ring 512
+#    by default; with those settings the TX completion interrupt rarely fires
+#    (the IC bit is only set every 25 frames), the ring fills up, ndo_start_xmit
+#    returns busy and the qdisc requeues massively (~500 Mbit/s TCP).
+#    Forcing one completion per packet (tx-usecs 1 / tx-frames 1) + moderate RX
+#    coalescing (rx-usecs 50) + ring 1024 lifts it to ~740 Mbit/s.
+#
+# 2) CPU governor. The default schedutil only ramps to ~1.4-1.6GHz under pure
+#    softirq load, and its scheduling overhead is high; performance (pinned at
+#    1.8GHz) raises the per-core NAPI ceiling from ~740 to ~870-930 Mbit/s.
+#    ondemand only reaches ~785 even at 1.8GHz, so performance is required.
+#
+# 3) The eth0 MAC interrupt defaults to CPU3 (shared with other work); pinning
+#    it to CPU1 measured best.
+#
+# Combined (iperf3): forward ~500 -> ~810, reverse ~700 -> ~930 Mbit/s;
+# reverse against 192.168.10.20 ~740 -> ~917 Mbit/s.
+
+wait_for() {
+	local i
+	for i in $(seq 1 "${2:-30}"); do
+		[ -e "$1" ] && return 0
+		sleep 1
+	done
+	return 1
+}
+
+# Wait for the boot-time IRQ balancer (balethirq.pl, started earlier by
+# start_service.sh) to finish so our IRQ affinity write below is final.
+for i in $(seq 1 20); do
+	pgrep -f balethirq.pl >/dev/null 2>&1 || break
+	sleep 1
+done
+
+wait_for /sys/class/net/eth0 || exit 0
+
+# 1) TX/RX coalescing + ring
+ethtool -C eth0 tx-usecs 1 tx-frames 1 rx-usecs 50 2>/dev/null
+ethtool -G eth0 rx 1024 tx 1024 2>/dev/null
+
+# 2) pin the performance governor (wait for the cpufreq policy to appear)
+wait_for /sys/devices/system/cpu/cpufreq/policy0/scaling_governor || true
+for i in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor; do
+	echo performance > "$i" 2>/dev/null
+done
+
+# 3) move the MAC interrupt off the default CPU3 to CPU1
+irq=$(awk -F: '/eth0$/ {gsub(/ /,"",$1); print $1; exit}' /proc/interrupts)
+[ -n "$irq" ] && echo 2 > "/proc/irq/$irq/smp_affinity" 2>/dev/null

@@ -254,11 +254,15 @@ if [[ "${openvfd_boxid}" != "0" && "${FDTFILE}" =~ ^meson- ]]; then
     ) &
 fi
 
-# Front bicolor LED and 7-segment display for HK1 RBOX X4 (Amlogic SC2).
+# SC2 (S905X4, HK1 RBOX X4) board services.
 # Mirrors the OpenWrt SC2 block; the scripts and profile live in the board overlay.
 sc2_board="no"
 [[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" || "${FDTFILE}" == "meson-sc2-s905x4-hk1-rbox-x4.dtb" ]] && sc2_board="yes"
 if [[ "${sc2_board}" == "yes" ]]; then
+    if [[ -x "/usr/local/bin/s905x4-net-tune" ]]; then
+        /usr/local/bin/s905x4-net-tune >/dev/null 2>&1 &
+        log_message "Gigabit network tuning (s905x4-net-tune) started."
+    fi
     if [[ -x "/usr/local/bin/s905x4-sysled" ]]; then
         /usr/local/bin/s905x4-sysled >/dev/null 2>&1 &
         log_message "Front LED indicator (s905x4-sysled) started."
