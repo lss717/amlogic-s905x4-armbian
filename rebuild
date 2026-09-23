@@ -772,6 +772,8 @@ make_image() {
     # Format bootfs partition
     if [[ "${bootfs_type}" == "fat32" ]]; then
         mkfs.vfat -F 32 -n "BOOT" ${loop_new}p1 >/dev/null 2>&1
+    elif [[ "${bootfs_type}" == "fat16" ]]; then
+        mkfs.vfat -F 16 -n "BOOT" ${loop_new}p1 >/dev/null 2>&1
     else
         mkfs.ext4 -F -q -U ${BOOT_UUID} -L "BOOT" -b 4k -m 0 ${loop_new}p1 >/dev/null 2>&1
     fi
@@ -851,7 +853,7 @@ copy_files() {
     chown root:root ${tag_bootfs} ${tag_rootfs}
 
     # Mount bootfs
-    if [[ "${bootfs_type}" == "fat32" ]]; then
+    if [[ "${bootfs_type}" == "fat32" || "${bootfs_type}" == "fat16" ]]; then
         mount_try vfat ${loop_new}p1 ${tag_bootfs}
     else
         mount_try ext4 ${loop_new}p1 ${tag_bootfs}
@@ -915,7 +917,7 @@ replace_kernel() {
     # 01. For /boot five files
     tar -mxzf ${kernel_boot} -C ${tag_bootfs}
     [[ "${PLATFORM}" == "allwinner" ]] && (cd ${tag_bootfs} && cp -f uInitrd-${kernel_name} uInitrd && cp -f vmlinuz-${kernel_name} Image)
-    [[ "${PLATFORM}" == "amlogic" ]] && (cd ${tag_bootfs} && cp -f uInitrd-${kernel_name} uInitrd && cp -f vmlinuz-${kernel_name} zImage)
+    [[ "${PLATFORM}" == "amlogic" ]] && (cd ${tag_bootfs} && cp -f vmlinuz-${kernel_name} zImage; { [[ -f uInitrd-${kernel_name} ]] && cp -f uInitrd-${kernel_name} uInitrd; } || true)
     [[ "${PLATFORM}" == "rockchip" ]] && (cd ${tag_bootfs} && ln -sf uInitrd-${kernel_name} uInitrd && ln -sf vmlinuz-${kernel_name} Image)
     [[ "$(ls ${tag_bootfs}/*${kernel_name} -l 2>/dev/null | grep "^-" | wc -l)" -ge "2" ]] || error_msg "The /boot files is missing."
     [[ "${PLATFORM}" == "amlogic" ]] && get_textoffset "${tag_bootfs}/zImage"
