@@ -1,0 +1,32 @@
+#!/bin/sh
+#==========================================================================
+# SC2 (S905X4, HK1 RBOX X4) 7-segment display launcher for OpenVFD.
+#
+# Mirrors the OpenWrt openwrt-openvfd "do_start" flow for the hk1rbox-x4
+# profile: load the openvfd module with the profile's pin/controller
+# parameters, then start the vfdservice userland daemon (clock + colon).
+# The usb/eth/wifi status icons are owned by s905x4-openvfd-icons.
+#==========================================================================
+
+openvfd_path="/usr/share/openvfd"
+conf_file="${openvfd_path}/conf/hk1rbox-x4.conf"
+openvfd_service="${openvfd_path}/vfdservice"
+
+[ -s "${conf_file}" ] || exit 0
+[ -x "${openvfd_service}" ] || exit 0
+
+. "${conf_file}" 2>/dev/null
+
+modprobe openvfd vfd_gpio_clk=${vfd_gpio_clk} \
+	vfd_gpio_dat=${vfd_gpio_dat} \
+	vfd_gpio_stb=${vfd_gpio_stb:-0,0,0xFF} \
+	vfd_gpio0=${vfd_gpio0:-0,0,0xFF} \
+	vfd_gpio1=${vfd_gpio1:-0,0,0xFF} \
+	vfd_gpio2=${vfd_gpio2:-0,0,0xFF} \
+	vfd_gpio3=${vfd_gpio3:-0,0,0xFF} \
+	vfd_gpio_protocol=${vfd_gpio_protocol:-0,0} \
+	vfd_chars=${vfd_chars} \
+	vfd_dot_bits=${vfd_dot_bits} \
+	vfd_display_type=${vfd_display_type}
+
+"${openvfd_service}" &

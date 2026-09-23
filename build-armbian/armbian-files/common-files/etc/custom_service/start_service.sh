@@ -254,6 +254,25 @@ if [[ "${openvfd_boxid}" != "0" && "${FDTFILE}" =~ ^meson- ]]; then
     ) &
 fi
 
+# Front bicolor LED and 7-segment display for HK1 RBOX X4 (Amlogic SC2).
+# Mirrors the OpenWrt SC2 block; the scripts and profile live in the board overlay.
+sc2_board="no"
+[[ "${FDTFILE}" == "meson-sc2-s905x4-gbit.dtb" || "${FDTFILE}" == "meson-sc2-s905x4-hk1-rbox-x4.dtb" ]] && sc2_board="yes"
+if [[ "${sc2_board}" == "yes" ]]; then
+    if [[ -x "/usr/local/bin/s905x4-sysled" ]]; then
+        /usr/local/bin/s905x4-sysled >/dev/null 2>&1 &
+        log_message "Front LED indicator (s905x4-sysled) started."
+    fi
+    if [[ -x "/usr/local/bin/s905x4-openvfd" ]]; then
+        /usr/local/bin/s905x4-openvfd >/dev/null 2>&1 &
+        log_message "OpenVFD 7-seg display (hk1rbox-x4) started."
+        if [[ -x "/usr/local/bin/s905x4-openvfd-icons" ]]; then
+            /usr/local/bin/s905x4-openvfd-icons >/dev/null 2>&1 &
+            log_message "OpenVFD status icons (s905x4-openvfd-icons) started."
+        fi
+    fi
+fi
+
 # For vplus(Allwinner h6) led color lights
 if [[ -x "/usr/bin/rgb-vplus" ]]; then
     rgb-vplus --RedName=RED --GreenName=GREEN --BlueName=BLUE >/dev/null 2>&1 &
