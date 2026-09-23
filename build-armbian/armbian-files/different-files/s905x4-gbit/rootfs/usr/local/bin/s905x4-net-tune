@@ -40,9 +40,10 @@ done
 
 wait_for /sys/class/net/eth0 || exit 0
 
-# 1) TX/RX coalescing + ring
-ethtool -C eth0 tx-usecs 1 tx-frames 1 rx-usecs 50 2>/dev/null
+# 1) ring first, then coalescing: changing the ringparam resets the TX
+#    coalescing to the driver defaults, so -C must come last.
 ethtool -G eth0 rx 1024 tx 1024 2>/dev/null
+ethtool -C eth0 tx-usecs 1 tx-frames 1 rx-usecs 50 2>/dev/null
 
 # 2) pin the performance governor (wait for the cpufreq policy to appear)
 wait_for /sys/devices/system/cpu/cpufreq/policy0/scaling_governor || true
